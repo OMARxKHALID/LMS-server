@@ -17,6 +17,7 @@ export const createBook = async (req, res) => {
       pdf_files,
       price = 0,
       borrowed_fine = 0,
+      uploaded_by,
     } = req.body;
 
     // Check if essential fields are present
@@ -56,6 +57,7 @@ export const createBook = async (req, res) => {
       pdf_files,
       price,
       borrowed_fine,
+      uploaded_by,
     });
 
     // Save the book to the database
@@ -131,6 +133,7 @@ export const editBook = async (req, res) => {
       pdf_files,
       price,
       borrowed_fine,
+      uploaded_by,
     } = req.body;
 
     // Check if book exists
@@ -172,6 +175,7 @@ export const editBook = async (req, res) => {
         pdf_files,
         price,
         borrowed_fine,
+        uploaded_by,
       },
       { new: true }
     );

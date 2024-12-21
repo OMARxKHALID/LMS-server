@@ -16,6 +16,7 @@ const bookSchema = new mongoose.Schema(
     price: { type: Number },
     borrowed_fine: { type: Number },
     pdf_files: { type: Array },
+    uploaded_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );
