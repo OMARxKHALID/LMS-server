@@ -14,6 +14,7 @@ const bookSchema = new mongoose.Schema(
     cover_image_url: { type: String },
     location: { type: String },
     price: { type: Number },
+    borrow_price: { type: Number },
     borrowed_fine: { type: Number },
     pdf_files: { type: Array },
     uploaded_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

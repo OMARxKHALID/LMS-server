@@ -8,7 +8,8 @@ const borrowSchema = new mongoose.Schema(
     expected_return_date: { type: Date, required: true },
     return_date: { type: Date },
     status: { type: String, default: "borrowed" },
-    total_borrowed_fine: { type: Number, default: 0.0 },
+    total_borrowed_fine: { type: Number, default: 0 },
+    total_borrow_price: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
