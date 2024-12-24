@@ -5,8 +5,7 @@ import User from "../models/userModel.js";
 // Borrow a book
 export const borrowBook = async (req, res) => {
   try {
-    const { borrowed_by, borrowed_book, expected_return_date, borrow_price } =
-      req.body;
+    const { borrowed_by, borrowed_book, expected_return_date } = req.body;
 
     if (!borrowed_by || !borrowed_book || !expected_return_date) {
       return res.status(400).json({
@@ -22,11 +21,13 @@ export const borrowBook = async (req, res) => {
       return res.status(400).json({ message: "Invalid expected return date" });
     }
 
+    // Check if the user exists
     const user = await User.findById(borrowed_by);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Check if the book exists
     const book = await Book.findById(borrowed_book);
     if (!book) {
       return res.status(404).json({ message: "Book not found" });
@@ -36,6 +37,20 @@ export const borrowBook = async (req, res) => {
       return res
         .status(400)
         .json({ message: "No available copies of the book" });
+    }
+
+    // Check if the user already borrowed the same book and hasn't returned it
+    const existingBorrow = await Borrow.findOne({
+      borrowed_by,
+      borrowed_book,
+      status: "borrowed",
+    });
+
+    if (existingBorrow) {
+      return res.status(400).json({
+        message:
+          "You have already borrowed this book. Please return it before borrowing again.",
+      });
     }
 
     const borrowDays = Math.ceil(
@@ -51,6 +66,7 @@ export const borrowBook = async (req, res) => {
       total_borrow_price: totalBorrowPrice,
     });
 
+    // Reduce available copies
     book.available_copies -= 1;
 
     await book.save();
