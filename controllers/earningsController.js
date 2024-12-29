@@ -1,11 +1,11 @@
 import Borrow from "../models/borrowModel.js";
 
-// Get earnings for a specific user
 export const getEarnings = async (req, res) => {
   try {
-    const { userId } = req.params;
-    const borrows = await Borrow.find({ borrowed_by: userId });
+    // Fetch all borrow records from the database
+    const borrows = await Borrow.find();
 
+    // Calculate total earnings
     const totalEarnings = borrows.reduce(
       (acc, borrow) => acc + borrow.total_borrow_price,
       0

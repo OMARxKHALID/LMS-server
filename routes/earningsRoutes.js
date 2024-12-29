@@ -3,6 +3,6 @@ import { getEarnings } from "../controllers/earningsController.js";
 
 const router = express.Router();
 
-router.get("/earnings/:userId", getEarnings);
+router.get("/earnings", getEarnings);
 
 export default router;
