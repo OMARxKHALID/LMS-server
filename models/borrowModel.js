@@ -9,6 +9,7 @@ const borrowSchema = new mongoose.Schema(
     return_date: { type: Date },
     status: { type: String, default: "borrowed" },
     total_borrowed_fine: { type: Number, default: 0 },
+    total_price: { type: Number, required: true },
     total_borrow_price: { type: Number, default: 0 },
   },
   { timestamps: true }

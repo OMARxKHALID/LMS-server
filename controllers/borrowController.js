@@ -75,6 +75,7 @@ export const borrowBook = async (req, res) => {
       borrowed_book,
       expected_return_date,
       total_borrow_price: totalBorrowPrice,
+      total_price: book.price,
     });
 
     // Reduce available copies
