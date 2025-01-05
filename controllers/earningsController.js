@@ -8,6 +8,7 @@ import {
   endOfWeek,
   endOfMonth,
   endOfYear,
+  format,
 } from "date-fns";
 
 export const getEarnings = async (req, res) => {
@@ -31,14 +32,19 @@ export const getEarnings = async (req, res) => {
       borrows
     );
     const topSellingBooks = await getTopSellingBooks(bookEarnings);
-    const dailyEarnings = calculateDailyEarnings(borrows);
+
+    const earningsData =
+      timeFrame === "year"
+        ? calculateMonthlyEarnings(borrows)
+        : calculateDailyEarnings(borrows, startDate, endDate);
 
     res.json({
       totalEarnings,
       previousEarnings,
       earningsByCategory,
       topSellingBooks,
-      dailyEarnings,
+      [timeFrame === "year" ? "monthlyEarnings" : "dailyEarnings"]:
+        earningsData,
     });
   } catch (error) {
     console.error(error);
@@ -108,16 +114,43 @@ const getTopSellingBooks = async (bookEarnings) => {
       id: book._id,
       title: book.title,
       author: book.author,
-      total_copies_borrowed: bookEarnings[book._id.toString()],
       earnings: bookEarnings[book._id.toString()],
     }))
     .sort((a, b) => b.earnings - a.earnings)
     .slice(0, 5);
 };
 
-const calculateDailyEarnings = (borrows) =>
-  borrows.reduce((dailyEarnings, { borrowed_date, total_borrow_price }) => {
-    const date = borrowed_date.toISOString().split("T")[0];
-    dailyEarnings[date] = (dailyEarnings[date] || 0) + total_borrow_price;
-    return dailyEarnings;
+const calculateDailyEarnings = (borrows, startDate, endDate) => {
+  const getAllDatesInRange = (start, end) => {
+    const dates = [];
+    let currentDate = new Date(start);
+    while (currentDate <= end) {
+      dates.push(currentDate.toISOString().split("T")[0]);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const allDates = getAllDatesInRange(startDate, endDate);
+
+  return allDates.reduce((acc, date) => {
+    const borrowsOnDate = borrows.filter(
+      (borrow) => borrow.borrowed_date.toISOString().split("T")[0] === date
+    );
+    acc[date] = borrowsOnDate.reduce(
+      (total, { total_borrow_price }) => total + total_borrow_price,
+      0
+    );
+    return acc;
   }, {});
+};
+
+const calculateMonthlyEarnings = (borrows) => {
+  const monthlyEarnings = borrows.reduce((acc, borrow) => {
+    const month = format(new Date(borrow.borrowed_date), "MMMM");
+    acc[month] = (acc[month] || 0) + borrow.total_borrow_price;
+    return acc;
+  }, {});
+
+  return monthlyEarnings;
+};
