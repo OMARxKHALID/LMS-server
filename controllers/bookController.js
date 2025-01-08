@@ -1,4 +1,6 @@
 import Book from "../models/bookModel.js";
+import Transaction from "../models/transactionModel.js";
+import User from "../models/userModel.js";
 
 // Create a new book
 export const createBook = async (req, res) => {
@@ -19,6 +21,7 @@ export const createBook = async (req, res) => {
       borrowed_fine = 0,
       uploaded_by,
       borrow_price = 0,
+      isPurchased = false,
     } = req.body;
 
     // Check if essential fields are present
@@ -60,6 +63,7 @@ export const createBook = async (req, res) => {
       borrowed_fine,
       uploaded_by,
       borrow_price,
+      isPurchased,
     });
 
     // Save the book to the database
@@ -137,6 +141,7 @@ export const editBook = async (req, res) => {
       borrowed_fine,
       uploaded_by,
       borrow_price,
+      isPurchased,
     } = req.body;
 
     // Check if book exists
@@ -180,6 +185,7 @@ export const editBook = async (req, res) => {
         borrowed_fine,
         uploaded_by,
         borrow_price,
+        isPurchased,
       },
       { new: true }
     );
@@ -189,6 +195,76 @@ export const editBook = async (req, res) => {
       .json({ message: "Book updated successfully", book: updatedBook });
   } catch (error) {
     console.error(error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Purchase a book
+export const purchaseBook = async (req, res) => {
+  try {
+    const { purchased_by, purchased_book, quantity } = req.body;
+    console.log("🚀 ~ purchaseBook ~ req.body:", req.body);
+
+    // Validate that required fields are provided
+    if (!purchased_by || !purchased_book || !quantity) {
+      return res
+        .status(400)
+        .json({ message: "User ID, Book ID, and quantity are required" });
+    }
+
+    // Find the book by ID
+    const book = await Book.findById(purchased_book);
+    if (!book) {
+      return res.status(404).json({ message: "Book not found" });
+    }
+
+    // Check if the requested quantity is available
+    if (book.available_copies < quantity) {
+      return res.status(400).json({ message: "Not enough copies available" });
+    }
+
+    // Find the user who is making the purchase
+    const user = await User.findById(purchased_by);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if the user has enough wallet balance (if applicable)
+    const totalPrice = book.price * quantity;
+    if (user.walletBalance < totalPrice) {
+      return res.status(400).json({ message: "Insufficient funds" });
+    }
+
+    // Create a new transaction for this purchase
+    const transaction = new Transaction({
+      book: purchased_by,
+      user: purchased_book,
+      quantity,
+      totalPrice,
+      status: "success",
+    });
+
+    // Save the transaction
+    await transaction.save();
+
+    // Update the user's wallet balance
+    user.walletBalance -= totalPrice;
+    await user.save();
+
+    // Update the book's available copies
+    book.available_copies -= quantity;
+    await book.save();
+
+    // Add the transaction to the user's transaction history
+    user.transactions.push(transaction._id);
+    await user.save();
+
+    // Return success response
+    res
+      .status(200)
+      .json({ message: "Book purchased successfully", transaction });
+  } catch (error) {
+    console.error("Error purchasing book:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };

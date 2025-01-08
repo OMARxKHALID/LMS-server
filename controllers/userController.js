@@ -1,9 +1,11 @@
-import User from "../models/userModel.js";
 import generateTokenAndSetCookie from "../utils/helpers/generateTokenAndSetCookie.js";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
+import Transaction from "../models/transactionModel.js";
+import User from "../models/userModel.js";
 
+// Create new user
 export const createUser = async (req, res) => {
   try {
     const { username, email, full_name, password, userType } = req.body;
@@ -31,6 +33,7 @@ export const createUser = async (req, res) => {
 
     await newUser.save();
 
+    // Generate token and set it in the cookie
     generateTokenAndSetCookie(newUser._id, res);
 
     res.status(201).json({
@@ -43,6 +46,7 @@ export const createUser = async (req, res) => {
   }
 };
 
+// User login
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -63,6 +67,7 @@ export const loginUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
+    // Generate token and set it in the cookie
     const token = generateTokenAndSetCookie(user._id, res);
 
     res.json({
@@ -71,6 +76,9 @@ export const loginUser = async (req, res) => {
       username: user.username,
       email: user.email,
       userType: user.userType,
+      walletBalance: user.walletBalance,
+      transactions: user.transactions,
+      address: user.address || {},
       token,
     });
   } catch (error) {
@@ -79,12 +87,17 @@ export const loginUser = async (req, res) => {
   }
 };
 
+// Get user profile
 export const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user_id);
+    const user = await User.findById(req.user_id)
+      .populate("transactions")
+      .exec();
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+
     res.json(user);
   } catch (error) {
     console.error("Error fetching user profile:", error);
@@ -92,6 +105,7 @@ export const getUserProfile = async (req, res) => {
   }
 };
 
+// Log out user
 export const logOutUser = async (req, res) => {
   try {
     res.clearCookie("jwt", {
@@ -107,6 +121,7 @@ export const logOutUser = async (req, res) => {
   }
 };
 
+// Request password reset
 export const requestPasswordReset = async (req, res) => {
   try {
     const { email } = req.body;
@@ -142,6 +157,7 @@ export const requestPasswordReset = async (req, res) => {
   }
 };
 
+// Reset user password
 export const resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
@@ -176,6 +192,7 @@ export const resetPassword = async (req, res) => {
   }
 };
 
+// Get all users
 export const getAllUsers = async (req, res) => {
   try {
     const users = await User.find();
@@ -186,6 +203,7 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
+// Update user
 export const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -212,9 +230,82 @@ export const updateUser = async (req, res) => {
       username: user.username,
       email: user.email,
       userType: user.userType,
+      walletBalance: user.walletBalance,
+      transactions: user.transactions,
+      address: user.address || {},
     });
   } catch (error) {
     console.error("Error updating user:", error);
+    res.status(500).json({ error: "Server error. Please try again later." });
+  }
+};
+
+// Get user transactions
+export const getUserTransactions = async (req, res) => {
+  try {
+    const transactions = await Transaction.find({ user: req.user_id })
+      .populate("book")
+      .exec();
+
+    if (!transactions || transactions.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No transactions found for this user" });
+    }
+
+    res.json(transactions);
+  } catch (error) {
+    console.error("Error fetching user transactions:", error);
+    res.status(500).json({ error: "Server error. Please try again later." });
+  }
+};
+
+// Update user address
+export const updateUserAddress = async (req, res) => {
+  try {
+    const { street, city, state, country, postalCode } = req.body;
+
+    if (!street || !city || !state || !country || !postalCode) {
+      return res
+        .status(400)
+        .json({ message: "All address fields are required" });
+    }
+
+    const user = await User.findById(req.user_id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.address = { street, city, state, country, postalCode };
+    await user.save();
+
+    res.json({
+      message: "Address updated successfully",
+      address: user.address,
+    });
+  } catch (error) {
+    console.error("Error updating address:", error);
+    res.status(500).json({ error: "Server error. Please try again later." });
+  }
+};
+
+// Get user address
+export const getUserAddress = async (req, res) => {
+  try {
+    const user = await User.findById(req.user_id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.address) {
+      return res.status(404).json({ message: "Address not set" });
+    }
+
+    res.json(user.address);
+  } catch (error) {
+    console.error("Error fetching user address:", error);
     res.status(500).json({ error: "Server error. Please try again later." });
   }
 };

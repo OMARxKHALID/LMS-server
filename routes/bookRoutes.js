@@ -5,6 +5,7 @@ import {
   getBook,
   deleteBook,
   editBook,
+  purchaseBook,
 } from "../controllers/bookController.js";
 
 const router = express.Router();
@@ -14,5 +15,6 @@ router.get("/books", getBooks);
 router.put("/books/:id", editBook);
 router.get("/books/:id", getBook);
 router.delete("/books/:id", deleteBook);
+router.post("/books/purchase", purchaseBook);
 
 export default router;
