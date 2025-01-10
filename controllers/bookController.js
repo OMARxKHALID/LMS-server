@@ -237,8 +237,8 @@ export const purchaseBook = async (req, res) => {
 
     // Create a new transaction for this purchase
     const transaction = new Transaction({
-      book: purchased_by,
-      user: purchased_book,
+      user: purchased_by,
+      book: purchased_book,
       quantity,
       totalPrice,
       status: "success",

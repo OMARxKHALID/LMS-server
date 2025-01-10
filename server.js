@@ -7,6 +7,7 @@ import bookRoutes from "./routes/bookRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import borrowRoutes from "./routes/borrowRoutes.js";
 import earningsRoutes from "./routes/earningsRoutes.js";
+import transactionRoutes from "./routes/transactionRoutes.js";
 
 import cors from "cors";
 
@@ -45,6 +46,7 @@ app.use("/api", bookRoutes);
 app.use("/api", categoryRoutes);
 app.use("/api", borrowRoutes);
 app.use("/api", earningsRoutes);
+app.use("/api", transactionRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).json({

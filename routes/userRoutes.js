@@ -24,8 +24,8 @@ router.post("/auth/request-password-reset", requestPasswordReset);
 router.post("/auth/reset-password/:token", resetPassword);
 router.put("/auth/users/:userId", authenticate, updateUser);
 router.post("/auth/users", authenticate, getAllUsers);
-router.get("/user/transactions", getUserTransactions);
-router.put("/user/address", updateUserAddress);
-router.get("/user/address", getUserAddress);
+router.get("/auth/transactions", getUserTransactions);
+router.put("/auth/address", updateUserAddress);
+router.get("/auth/address", getUserAddress);
 
 export default router;

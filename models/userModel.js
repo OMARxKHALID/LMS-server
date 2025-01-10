@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     full_name: { type: String, required: true },
     password: { type: String, minLength: 5, required: true },
-    userType: { type: String, enum: ["buyer", "seller"], required: true },
+    userType: { type: String, enum: ["admin", "user"], required: true },
     walletBalance: { type: Number, default: 1000000000 },
     transactions: [
       { type: mongoose.Schema.Types.ObjectId, ref: "Transaction" },
