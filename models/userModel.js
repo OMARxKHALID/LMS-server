@@ -6,7 +6,12 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true },
     full_name: { type: String, required: true },
     password: { type: String, minLength: 5, required: true },
-    userType: { type: String, enum: ["admin", "user"], required: true },
+    userType: {
+      type: String,
+      enum: ["admin", "user"],
+      default: "user",
+      required: true,
+    },
     walletBalance: { type: Number, default: 1000000000 },
     transactions: [
       { type: mongoose.Schema.Types.ObjectId, ref: "Transaction" },
@@ -20,6 +25,17 @@ const userSchema = new mongoose.Schema(
     },
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
+    borrowedBooks: [
+      {
+        title: { type: String, required: true },
+        author: { type: String, required: true },
+        pdf: { type: String, required: true },
+        borrowed_date: { type: Date, default: Date.now },
+        expected_return_date: { type: Date, required: true },
+        return_date: { type: Date },
+        status: { type: String, required: true },
+      },
+    ],
   },
   { timestamps: true }
 );

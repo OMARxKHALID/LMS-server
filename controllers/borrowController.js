@@ -126,8 +126,9 @@ export const returnBook = async (req, res) => {
     const currentDate = new Date();
     let totalBorrowedFine = 0;
 
+    // Calculate late fine if return date exceeds expected return date
     if (currentDate > borrow.expected_return_date) {
-      const lateDays = Math.floor(
+      const lateDays = Math.ceil(
         (currentDate - borrow.expected_return_date) / (1000 * 60 * 60 * 24)
       );
       totalBorrowedFine = lateDays * book.borrowed_fine;
@@ -161,10 +162,31 @@ export const getBorrowRecords = async (req, res) => {
     // Fetch borrow records with populated user and book details
     const records = await Borrow.find()
       .populate("borrowed_by", "username email")
-      .populate("borrowed_book", "title author");
+      .populate("borrowed_book", "title author borrowed_fine");
 
-    // Return the borrow records
-    res.json(records);
+    // Calculate late fine for each record
+    const updatedRecords = records.map((record) => {
+      let totalBorrowedFine = 0;
+      const currentDate = new Date();
+
+      // Calculate late fine if applicable
+      if (
+        !record.return_date && // Book not yet returned
+        currentDate > record.expected_return_date
+      ) {
+        const lateDays = Math.ceil(
+          (currentDate - record.expected_return_date) / (1000 * 60 * 60 * 24)
+        );
+        totalBorrowedFine = lateDays * record.borrowed_book.borrowed_fine;
+      }
+
+      return {
+        ...record.toObject(),
+        late_fine: totalBorrowedFine || 0,
+      };
+    });
+
+    res.json(updatedRecords);
   } catch (error) {
     console.error(error);
     res.status(500).json({

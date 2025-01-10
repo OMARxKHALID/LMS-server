@@ -71,7 +71,7 @@ export const loginUser = async (req, res) => {
     const token = generateTokenAndSetCookie(user._id, res);
 
     res.json({
-      message: "Login successful",
+      message: "LOGGED-IN",
       _id: user._id,
       username: user.username,
       email: user.email,
@@ -79,6 +79,7 @@ export const loginUser = async (req, res) => {
       walletBalance: user.walletBalance,
       transactions: user.transactions,
       address: user.address || {},
+      borrowedBooks: user.borrowedBooks,
       token,
     });
   } catch (error) {
@@ -232,6 +233,7 @@ export const updateUser = async (req, res) => {
       userType: user.userType,
       walletBalance: user.walletBalance,
       transactions: user.transactions,
+
       address: user.address || {},
     });
   } catch (error) {
@@ -306,6 +308,24 @@ export const getUserAddress = async (req, res) => {
     res.json(user.address);
   } catch (error) {
     console.error("Error fetching user address:", error);
+    res.status(500).json({ error: "Server error. Please try again later." });
+  }
+};
+
+export const getUserBorrowedBooks = async (req, res) => {
+  try {
+    const user = await User.findById(req.user_id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      message: "Borrowed books retrieved successfully",
+      borrowedBooks: user.borrowedBooks,
+    });
+  } catch (error) {
+    console.error("Error fetching borrowed books for user:", error);
     res.status(500).json({ error: "Server error. Please try again later." });
   }
 };
