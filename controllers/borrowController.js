@@ -165,7 +165,7 @@ export const getBorrowRecords = async (req, res) => {
     // Fetch borrow records with populated user and book details
     const records = await Borrow.find()
       .populate("borrowed_by", "username email")
-      .populate("borrowed_book", "title author borrowed_fine");
+      .populate("borrowed_book", "title author borrowed_fine pdf_files");
 
     // Calculate late fine for each record
     const updatedRecords = records.map((record) => {
