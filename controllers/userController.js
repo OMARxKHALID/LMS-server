@@ -4,13 +4,14 @@ import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
 import Transaction from "../models/transactionModel.js";
 import User from "../models/userModel.js";
+import Borrow from "../models/borrowModel.js";
 
 // Create new user
 export const createUser = async (req, res) => {
   try {
-    const { username, email, full_name, password, userType } = req.body;
+    const { username, email, full_name, password, role } = req.body;
 
-    if (!username || !email || !full_name || !password || !userType) {
+    if (!username || !email || !full_name || !password || !role) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
@@ -28,7 +29,7 @@ export const createUser = async (req, res) => {
       email,
       full_name,
       password: hashedPassword,
-      userType,
+      role,
     });
 
     await newUser.save();
@@ -75,7 +76,7 @@ export const loginUser = async (req, res) => {
       _id: user._id,
       username: user.username,
       email: user.email,
-      userType: user.userType,
+      role: user.role,
       walletBalance: user.walletBalance,
       transactions: user.transactions,
       address: user.address || {},
@@ -230,7 +231,7 @@ export const updateUser = async (req, res) => {
       _id: user._id,
       username: user.username,
       email: user.email,
-      userType: user.userType,
+      role: user.role,
       walletBalance: user.walletBalance,
       transactions: user.transactions,
 
@@ -313,16 +314,19 @@ export const getUserAddress = async (req, res) => {
 };
 
 export const getUserBorrowedBooks = async (req, res) => {
+  const { userId } = req.params;
+
   try {
-    const user = await User.findById(req.user_id);
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+    const borrowedBooks = await Borrow.find({ borrowed_by: userId });
 
     res.json({
       message: "Borrowed books retrieved successfully",
-      borrowedBooks: user.borrowedBooks,
+      borrowedBooks,
     });
   } catch (error) {
     console.error("Error fetching borrowed books for user:", error);

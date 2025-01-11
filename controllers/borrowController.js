@@ -81,8 +81,11 @@ export const borrowBook = async (req, res) => {
     // Reduce available copies
     book.available_copies -= 1;
 
-    await book.save();
-    await borrow.save();
+    // Add the borrow record to the user's borrowedBooks
+    user.borrowedBooks.push(borrow._id);
+
+    // Save changes to user, book, and borrow records
+    await Promise.all([user.save(), book.save(), borrow.save()]);
 
     res.status(201).json({
       borrow,

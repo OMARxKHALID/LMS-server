@@ -28,6 +28,6 @@ router.post("/auth/users", authenticate, getAllUsers);
 router.get("/auth/user/transactions", getUserTransactions);
 router.put("/auth/user/address", updateUserAddress);
 router.get("/auth/user/address", getUserAddress);
-router.get("/auth/user/:userId/borrowed-books", getUserBorrowedBooks);
+router.get("/auth/user/borrowed-books/:userId", getUserBorrowedBooks);
 
 export default router;

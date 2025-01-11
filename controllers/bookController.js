@@ -21,7 +21,6 @@ export const createBook = async (req, res) => {
       borrowed_fine = 0,
       uploaded_by,
       borrow_price = 0,
-      isPurchased = false,
     } = req.body;
 
     // Check if essential fields are present
@@ -63,7 +62,6 @@ export const createBook = async (req, res) => {
       borrowed_fine,
       uploaded_by,
       borrow_price,
-      isPurchased,
     });
 
     // Save the book to the database
@@ -252,6 +250,8 @@ export const purchaseBook = async (req, res) => {
 
     // Update the book's available copies
     book.available_copies -= quantity;
+    book.isPurchased = true;
+    book.purchased_date = new Date();
     await book.save();
 
     // Add the transaction to the user's transaction history

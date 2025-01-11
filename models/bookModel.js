@@ -18,6 +18,8 @@ const bookSchema = new mongoose.Schema(
     borrowed_fine: { type: Number },
     pdf_files: { type: Array },
     uploaded_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    isPurchased: { type: Boolean, default: false },
+    purchased_date: { type: Date },
   },
   { timestamps: true }
 );
