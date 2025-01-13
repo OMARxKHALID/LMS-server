@@ -5,24 +5,29 @@ const bookSchema = new mongoose.Schema(
     title: { type: String, required: true },
     author: { type: String, required: true },
     isbn: { type: String, required: true, unique: true },
-    description: { type: String },
-    publisher: { type: String },
-    publication_date: { type: Date },
+    description: { type: String, default: "" },
     category: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
-    total_copies: { type: Number, default: 1 },
-    available_copies: { type: Number, default: 1 },
     cover_image_url: { type: String },
-    location: { type: String },
+    pdf_files: [{ type: String }],
+    borrow_fine: { type: Number },
     price: { type: Number },
     borrow_price: { type: Number },
-    borrowed_fine: { type: Number },
-    pdf_files: { type: Array },
+    publication_date: { type: Date },
+    publisher: { type: String },
+    total_copies: { type: Number, default: 100 },
+    available_copies: { type: Number, default: 100 },
     uploaded_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    isPurchased: { type: Boolean, default: false },
+    is_purchased: { type: Boolean, default: false },
     purchased_date: { type: Date },
   },
   { timestamps: true }
 );
+
+// Method to check if a book is available for borrowing
+bookSchema.statics.isAvailableForBorrow = async function (bookId) {
+  const book = await this.findById(bookId);
+  return book && book.available_copies > 0;
+};
 
 const Book = mongoose.model("Book", bookSchema);
 

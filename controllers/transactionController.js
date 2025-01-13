@@ -36,19 +36,18 @@ export const createTransaction = async (req, res) => {
     // Calculate total price
     const totalPrice = book.price * quantity;
 
-    // Create a new transaction
+    // Create and save the new transaction
     const transaction = new Transaction({
       user: userId,
       book: bookId,
       quantity,
-      totalPrice,
+      total_price: totalPrice,
       status: "success",
     });
 
-    // Save the transaction
     await transaction.save();
 
-    // Update book availability
+    // Update the book's available copies
     book.available_copies -= quantity;
     await book.save();
 
@@ -70,7 +69,7 @@ export const createTransaction = async (req, res) => {
 export const getAllTransactions = async (req, res) => {
   try {
     const transactions = await Transaction.find()
-      .populate("user", "username email")
+      .populate("user", "user_name email")
       .populate("book", "title author")
       .exec();
 
@@ -87,7 +86,7 @@ export const getTransactionById = async (req, res) => {
     const { transactionId } = req.params;
 
     const transaction = await Transaction.findById(transactionId)
-      .populate("user", "username email")
+      .populate("user", "user_name email")
       .populate("book", "title author")
       .exec();
 

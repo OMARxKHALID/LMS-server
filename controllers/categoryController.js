@@ -2,13 +2,13 @@ import Category from "../models/categoryModel.js";
 
 export const createCategory = async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name } = req.body;
 
     if (!name) {
       return res.status(400).json({ message: "Category name is required" });
     }
 
-    const category = new Category({ name, description });
+    const category = new Category({ name });
     await category.save();
 
     res
@@ -32,10 +32,10 @@ export const getCategories = async (req, res) => {
 
 export const updateCategory = async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name } = req.body;
     const category = await Category.findByIdAndUpdate(
       req.params.id,
-      { name, description },
+      { name },
       { new: true }
     );
 

@@ -8,10 +8,6 @@ import {
   resetPassword,
   getAllUsers,
   updateUser,
-  updateUserAddress,
-  getUserTransactions,
-  getUserAddress,
-  getUserBorrowedBooks,
 } from "../controllers/userController.js";
 import { authenticate } from "../middlewares/authMiddleware.js";
 
@@ -25,9 +21,5 @@ router.post("/auth/request-password-reset", requestPasswordReset);
 router.post("/auth/reset-password/:token", resetPassword);
 router.put("/auth/user/:userId", authenticate, updateUser);
 router.post("/auth/users", authenticate, getAllUsers);
-router.get("/auth/user/transactions", getUserTransactions);
-router.put("/auth/user/address", updateUserAddress);
-router.get("/auth/user/address", getUserAddress);
-router.get("/auth/user/borrowed-books/:userId", getUserBorrowedBooks);
 
 export default router;

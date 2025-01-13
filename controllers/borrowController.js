@@ -2,15 +2,66 @@ import Borrow from "../models/borrowModel.js";
 import Book from "../models/bookModel.js";
 import User from "../models/userModel.js";
 
+// Helper function to check if a book is available
+const isBookAvailable = async (borrowed_book) => {
+  const book = await Book.findById(borrowed_book);
+  if (!book || book.available_copies <= 0) {
+    throw new Error(
+      "This book is currently unavailable, all copies are borrowed."
+    );
+  }
+  return book;
+};
+
+// Helper function to check if a user exists
+const isUserExists = async (borrowed_by) => {
+  const user = await User.findById(borrowed_by);
+  if (!user) {
+    throw new Error("User not found. Please check the User ID.");
+  }
+  return user;
+};
+
+// Helper function to check if a user has already borrowed the same book
+const hasUserAlreadyBorrowedBook = async (borrowed_by, borrowed_book) => {
+  const existingBorrow = await Borrow.findOne({
+    borrowed_by,
+    borrowed_book,
+    status: "borrowed",
+  });
+  if (existingBorrow) {
+    throw new Error(
+      "You have already borrowed this book and have not returned it yet."
+    );
+  }
+};
+
+// Helper function to calculate the borrow price
+const calculateBorrowPrice = (borrowDays, borrowPrice) => {
+  return borrowDays * borrowPrice;
+};
+
+// Helper function to update the borrow record and book availability
+const updateBorrowAndBook = async (borrow, book, user) => {
+  // Reduce available copies of the book
+  book.available_copies -= 1;
+
+  // Add the borrow record to the user's borrowedBooks
+  user.borrowed_books.push(borrow._id);
+
+  // Save the borrow, book, and user
+  await Promise.all([user.save(), book.save(), borrow.save()]);
+};
+
 // Borrow a book
 export const borrowBook = async (req, res) => {
   try {
     const { borrowed_by, borrowed_book, expected_return_date } = req.body;
 
+    // Validate input fields
     if (!borrowed_by || !borrowed_book || !expected_return_date) {
       return res.status(400).json({
-        message:
-          "Please provide User ID, Book ID, and Expected Return Date to proceed.",
+        message: "Please provide User ID, Book ID, and Expected Return Date.",
       });
     }
 
@@ -20,56 +71,29 @@ export const borrowBook = async (req, res) => {
       expectedReturnDate < new Date()
     ) {
       return res.status(400).json({
-        message:
-          "The Expected Return Date is invalid or set in the past. Please provide a valid date.",
+        message: "Invalid Expected Return Date. It cannot be in the past.",
       });
     }
 
     // Check if the user exists
-    const user = await User.findById(borrowed_by);
-    if (!user) {
-      return res.status(404).json({
-        message:
-          "The specified user could not be found. Please check the User ID and try again.",
-      });
-    }
+    const user = await isUserExists(borrowed_by);
 
-    // Check if the book exists
-    const book = await Book.findById(borrowed_book);
-    if (!book) {
-      return res.status(404).json({
-        message:
-          "The requested book could not be found. Please check the Book ID and try again.",
-      });
-    }
-
-    if (book.available_copies <= 0) {
-      return res.status(400).json({
-        message:
-          "This book is currently unavailable as all copies are borrowed.",
-      });
-    }
+    // Check if the book is available
+    const book = await isBookAvailable(borrowed_book);
 
     // Check if the user already borrowed the same book and hasn't returned it
-    const existingBorrow = await Borrow.findOne({
-      borrowed_by,
-      borrowed_book,
-      status: "borrowed",
-    });
+    await hasUserAlreadyBorrowedBook(borrowed_by, borrowed_book);
 
-    if (existingBorrow) {
-      return res.status(400).json({
-        message:
-          "You have already borrowed this book and have not returned it yet. Please return it before borrowing again.",
-      });
-    }
-
+    // Calculate borrow price based on expected return date
     const borrowDays = Math.ceil(
       (expectedReturnDate - new Date()) / (1000 * 60 * 60 * 24)
     );
+    const totalBorrowPrice = calculateBorrowPrice(
+      borrowDays,
+      book.borrow_price
+    );
 
-    const totalBorrowPrice = borrowDays * book.borrow_price;
-
+    // Create a new borrow record
     const borrow = new Borrow({
       borrowed_by,
       borrowed_book,
@@ -78,24 +102,17 @@ export const borrowBook = async (req, res) => {
       total_price: book.price,
     });
 
-    // Reduce available copies
-    book.available_copies -= 1;
-
-    // Add the borrow record to the user's borrowedBooks
-    user.borrowedBooks.push(borrow._id);
-
-    // Save changes to user, book, and borrow records
-    await Promise.all([user.save(), book.save(), borrow.save()]);
+    // Update borrow record and book availability
+    await updateBorrowAndBook(borrow, book, user);
 
     res.status(201).json({
       borrow,
-      total_borrow_price: totalBorrowPrice,
     });
   } catch (error) {
     console.error(error.message);
-    res
-      .status(500)
-      .json({ error: "An unexpected error occurred. Please try again later." });
+    res.status(500).json({
+      error: error.message || "An error occurred. Please try again later.",
+    });
   }
 };
 
@@ -104,57 +121,59 @@ export const returnBook = async (req, res) => {
   try {
     const { borrowId } = req.params;
 
+    // Find the borrow record
     const borrow = await Borrow.findById(borrowId);
     if (!borrow) {
       return res.status(404).json({
-        message:
-          "The borrow record could not be found. Please check the Borrow ID and try again.",
+        message: "Borrow record not found. Please check the Borrow ID.",
       });
     }
 
     const book = await Book.findById(borrow.borrowed_book);
     if (!book) {
       return res.status(404).json({
-        message:
-          "The associated book could not be found. Please contact support if this issue persists.",
+        message: "The associated book was not found.",
       });
     }
 
     if (borrow.return_date) {
-      return res
-        .status(400)
-        .json({ message: "This book has already been returned." });
+      return res.status(400).json({
+        message: "This book has already been returned.",
+      });
     }
 
     const currentDate = new Date();
-    let totalBorrowedFine = 0;
 
-    // Calculate late fine if return date exceeds expected return date
-    if (currentDate > borrow.expected_return_date) {
-      const lateDays = Math.ceil(
-        (currentDate - borrow.expected_return_date) / (1000 * 60 * 60 * 24)
-      );
-      totalBorrowedFine = lateDays * book.borrowed_fine;
-    }
-
+    // Update borrow record with return date and fine
     borrow.return_date = currentDate;
-    borrow.total_borrowed_fine = totalBorrowedFine;
     borrow.status = "returned";
-    book.available_copies += 1;
 
-    await book.save();
+    // Calculate overdue fine if any
+    const overdueFine = borrow.total_borrowed_fine;
+
+    // Save the borrow record
     await borrow.save();
 
-    res.status(200).json({
-      borrow,
-      late_fine: totalBorrowedFine,
-      total_price_paid: borrow.total_borrow_price + totalBorrowedFine,
-    });
+    // Increase available copies of the book
+    book.available_copies += 1;
+
+    // Save the updated book
+    await book.save();
+
+    // Return updated borrow record
+    const updatedBorrow = {
+      ...borrow.toObject(),
+      late_fine: overdueFine,
+      total_price_paid: borrow.total_borrow_price + overdueFine,
+    };
+
+    res.status(200).json(updatedBorrow);
   } catch (error) {
     console.error(error.message);
     res.status(500).json({
       error:
-        "An unexpected error occurred while returning the book. Please try again later.",
+        error.message ||
+        "An error occurred while returning the book. Please try again later.",
     });
   }
 };
@@ -164,28 +183,14 @@ export const getBorrowRecords = async (req, res) => {
   try {
     // Fetch borrow records with populated user and book details
     const records = await Borrow.find()
-      .populate("borrowed_by", "username email")
-      .populate("borrowed_book", "title author borrowed_fine pdf_files");
+      .populate("borrowed_by", " user_name email")
+      .populate("borrowed_book", "title authors borrowed_fine pdf_files");
 
     // Calculate late fine for each record
     const updatedRecords = records.map((record) => {
-      let totalBorrowedFine = 0;
-      const currentDate = new Date();
-
-      // Calculate late fine if applicable
-      if (
-        !record.return_date && // Book not yet returned
-        currentDate > record.expected_return_date
-      ) {
-        const lateDays = Math.ceil(
-          (currentDate - record.expected_return_date) / (1000 * 60 * 60 * 24)
-        );
-        totalBorrowedFine = lateDays * record.borrowed_book.borrowed_fine;
-      }
-
       return {
         ...record.toObject(),
-        late_fine: totalBorrowedFine || 0,
+        late_fine: record.total_borrowed_fine || 0,
       };
     });
 
@@ -193,8 +198,7 @@ export const getBorrowRecords = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({
-      error:
-        "An unexpected error occurred while retrieving borrow records. Please try again later.",
+      error: "An error occurred while retrieving borrow records.",
     });
   }
 };

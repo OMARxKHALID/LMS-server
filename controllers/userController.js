@@ -4,18 +4,19 @@ import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
 import Transaction from "../models/transactionModel.js";
 import User from "../models/userModel.js";
-import Borrow from "../models/borrowModel.js";
 
 // Create new user
 export const createUser = async (req, res) => {
   try {
-    const { username, email, full_name, password, role } = req.body;
+    const { user_name, email, full_name, password, role } = req.body;
 
-    if (!username || !email || !full_name || !password || !role) {
+    if (!user_name || !email || !full_name || !password || !role) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    const existingUser = await User.findOne({
+      $or: [{ email }, { user_name }],
+    });
     if (existingUser) {
       return res
         .status(400)
@@ -25,7 +26,7 @@ export const createUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({
-      username,
+      user_name,
       email,
       full_name,
       password: hashedPassword,
@@ -34,12 +35,11 @@ export const createUser = async (req, res) => {
 
     await newUser.save();
 
-    // Generate token and set it in the cookie
     generateTokenAndSetCookie(newUser._id, res);
 
     res.status(201).json({
       message: "User created successfully",
-      user: newUser,
+      newUser,
     });
   } catch (error) {
     console.error("Error creating user:", error);
@@ -69,19 +69,19 @@ export const loginUser = async (req, res) => {
     }
 
     // Generate token and set it in the cookie
-    const token = generateTokenAndSetCookie(user._id, res);
+    generateTokenAndSetCookie(user._id, res);
 
     res.json({
       message: "LOGGED-IN",
       _id: user._id,
-      username: user.username,
+      user_name: user.user_name,
       email: user.email,
+      full_name: user.full_name,
       role: user.role,
-      walletBalance: user.walletBalance,
+      wallet_balance: user.wallet_balance,
       transactions: user.transactions,
-      address: user.address || {},
-      borrowedBooks: user.borrowedBooks,
-      token,
+      address: user.address,
+      borrowed_books: user.borrowed_books,
     });
   } catch (error) {
     console.error("Error logging in:", error);
@@ -137,11 +137,11 @@ export const requestPasswordReset = async (req, res) => {
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
-    user.resetPasswordToken = crypto
+    user.reset_password_token = crypto
       .createHash("sha256")
       .update(resetToken)
       .digest("hex");
-    user.resetPasswordExpires = Date.now() + 24 * 60 * 60 * 1000; // 1 day
+    user.reset_password_expires = Date.now() + 24 * 60 * 60 * 1000; // 1 day
     await user.save();
 
     const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
@@ -174,8 +174,8 @@ export const resetPassword = async (req, res) => {
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
     const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() },
+      reset_password_token: hashedToken,
+      reset_password_expires: { $gt: Date.now() },
     });
 
     if (!user) {
@@ -183,8 +183,8 @@ export const resetPassword = async (req, res) => {
     }
 
     user.password = await bcrypt.hash(password, 10);
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
+    user.reset_password_token = undefined;
+    user.reset_password_expires = undefined;
     await user.save();
 
     res.status(200).json({ message: "Password has been reset successfully" });
@@ -227,109 +227,15 @@ export const updateUser = async (req, res) => {
     }
 
     res.json({
-      message: "User updated successfully",
-      _id: user._id,
-      username: user.username,
+      user_name: user.user_name,
       email: user.email,
+      full_name: user.full_name,
       role: user.role,
-      walletBalance: user.walletBalance,
-      transactions: user.transactions,
-
-      address: user.address || {},
-    });
-  } catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).json({ error: "Server error. Please try again later." });
-  }
-};
-
-// Get user transactions
-export const getUserTransactions = async (req, res) => {
-  try {
-    const transactions = await Transaction.find({ user: req.user_id })
-      .populate("book")
-      .exec();
-
-    if (!transactions || transactions.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No transactions found for this user" });
-    }
-
-    res.json(transactions);
-  } catch (error) {
-    console.error("Error fetching user transactions:", error);
-    res.status(500).json({ error: "Server error. Please try again later." });
-  }
-};
-
-// Update user address
-export const updateUserAddress = async (req, res) => {
-  try {
-    const { street, city, state, country, postalCode } = req.body;
-
-    if (!street || !city || !state || !country || !postalCode) {
-      return res
-        .status(400)
-        .json({ message: "All address fields are required" });
-    }
-
-    const user = await User.findById(req.user_id);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    user.address = { street, city, state, country, postalCode };
-    await user.save();
-
-    res.json({
-      message: "Address updated successfully",
+      wallet_balance: user.wallet_balance,
       address: user.address,
     });
   } catch (error) {
-    console.error("Error updating address:", error);
-    res.status(500).json({ error: "Server error. Please try again later." });
-  }
-};
-
-// Get user address
-export const getUserAddress = async (req, res) => {
-  try {
-    const user = await User.findById(req.user_id);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (!user.address) {
-      return res.status(404).json({ message: "Address not set" });
-    }
-
-    res.json(user.address);
-  } catch (error) {
-    console.error("Error fetching user address:", error);
-    res.status(500).json({ error: "Server error. Please try again later." });
-  }
-};
-
-export const getUserBorrowedBooks = async (req, res) => {
-  const { userId } = req.params;
-
-  try {
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    const borrowedBooks = await Borrow.find({ borrowed_by: userId });
-
-    res.json({
-      message: "Borrowed books retrieved successfully",
-      borrowedBooks,
-    });
-  } catch (error) {
-    console.error("Error fetching borrowed books for user:", error);
+    console.error("Error updating user:", error);
     res.status(500).json({ error: "Server error. Please try again later." });
   }
 };
