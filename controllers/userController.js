@@ -7,9 +7,9 @@ import User from "../models/userModel.js";
 // Create new user
 export const createUser = async (req, res) => {
   try {
-    const { user_name, email, full_name, password, role } = req.body;
+    const { user_name, email, full_name, password } = req.body;
 
-    if (!user_name || !email || !full_name || !password || !role) {
+    if (!user_name || !email || !full_name || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
@@ -33,7 +33,6 @@ export const createUser = async (req, res) => {
       email,
       full_name,
       password: hashedPassword,
-      role,
     });
     await newUser.save();
 
@@ -295,5 +294,34 @@ export const revokeUserAccess = async (req, res) => {
   } catch (error) {
     console.error("Error updating user status:", error);
     res.status(500).json({ error: "Server error. Please try again later." });
+  }
+};
+
+// chnage user role
+export const updateUserRole = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    if (!role || !["admin", "user"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role provided." });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { role },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Role updated successfully.", user: updatedUser });
+  } catch (error) {
+    console.error("Error updating user role:", error.message);
+    res.status(500).json({ message: "Internal server error." });
   }
 };
