@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    user_name: { type: String, required: true, unique: true },
+    user_name: { type: String, required: true, unique: true, parse: true },
     email: { type: String, required: true, unique: true },
     full_name: { type: String, required: true },
     password: { type: String, minlength: 5, required: true },
@@ -25,6 +25,11 @@ const userSchema = new mongoose.Schema(
     reset_password_token: { type: String },
     reset_password_expires: { type: Date },
     borrowed_books: [{ type: mongoose.Schema.Types.ObjectId, ref: "Borrow" }],
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
+    },
   },
   { timestamps: true }
 );

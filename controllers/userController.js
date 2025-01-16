@@ -2,7 +2,6 @@ import generateTokenAndSetCookie from "../utils/helpers/generateTokenAndSetCooki
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
-import Transaction from "../models/transactionModel.js";
 import User from "../models/userModel.js";
 
 // Create new user
@@ -17,10 +16,14 @@ export const createUser = async (req, res) => {
     const existingUser = await User.findOne({
       $or: [{ email }, { user_name }],
     });
+
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ message: "Email or username already exists" });
+      return res.status(400).json({
+        message:
+          existingUser.email === email
+            ? "Email already exists"
+            : "Username already exists",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -32,17 +35,27 @@ export const createUser = async (req, res) => {
       password: hashedPassword,
       role,
     });
-
     await newUser.save();
 
     generateTokenAndSetCookie(newUser._id, res);
-
     res.status(201).json({
       message: "User created successfully",
-      newUser,
+      user: {
+        user_name: newUser.user_name,
+        email: newUser.email,
+        full_name: newUser.full_name,
+        role: newUser.role,
+        status: newUser.status,
+        _id: newUser._id,
+      },
     });
   } catch (error) {
     console.error("Error creating user:", error);
+    if (error.code === 11000) {
+      return res
+        .status(400)
+        .json({ message: "Duplicate key error. Please check your input." });
+    }
     res.status(500).json({ error: "Server error. Please try again later." });
   }
 };
@@ -63,6 +76,13 @@ export const loginUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
+    // Check if user is inactive
+    if (user.status === "inactive") {
+      return res.status(403).json({
+        message: "Your account has been revoked. Please contact ADMIN.",
+      });
+    }
+
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
       return res.status(400).json({ message: "Invalid email or password" });
@@ -78,6 +98,7 @@ export const loginUser = async (req, res) => {
       email: user.email,
       full_name: user.full_name,
       role: user.role,
+      status: user.status,
       wallet_balance: user.wallet_balance,
       transactions: user.transactions,
       address: user.address,
@@ -98,6 +119,12 @@ export const getUserProfile = async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.status === "inactive") {
+      return res.status(403).json({
+        message: "Your account has been revoked. Please contact ADMIN.",
+      });
     }
 
     res.json(user);
@@ -231,11 +258,42 @@ export const updateUser = async (req, res) => {
       email: user.email,
       full_name: user.full_name,
       role: user.role,
+      status: user.status,
       wallet_balance: user.wallet_balance,
       address: user.address,
     });
   } catch (error) {
     console.error("Error updating user:", error);
+    res.status(500).json({ error: "Server error. Please try again later." });
+  }
+};
+
+export const revokeUserAccess = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { status } = req.body;
+
+    if (!userId || !status) {
+      return res
+        .status(400)
+        .json({ message: "User ID and status are required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.status === status) {
+      return res.status(400).json({ message: `User is already ${status}` });
+    }
+
+    user.status = status;
+    await user.save();
+
+    res.status(200).json({ message: `User status updated to ${status}`, user });
+  } catch (error) {
+    console.error("Error updating user status:", error);
     res.status(500).json({ error: "Server error. Please try again later." });
   }
 };
