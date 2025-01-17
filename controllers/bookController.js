@@ -175,6 +175,7 @@ export const editBook = async (req, res) => {
 export const purchaseBook = async (req, res) => {
   try {
     const { purchased_by, purchased_book, quantity } = req.body;
+    console.log("🚀 ~ purchaseBook ~ purchased_book:", purchased_book);
 
     if (!purchased_by || !purchased_book || !quantity) {
       return res
@@ -215,9 +216,11 @@ export const purchaseBook = async (req, res) => {
     book.purchased_date = new Date();
     await book.save();
 
-    user.transactions.push(transaction._id);
+    user.purchased_books.push(purchased_book);
     await user.save();
 
+    user.transactions.push(transaction._id);
+    await user.save();
     res
       .status(200)
       .json({ message: "Book purchased successfully", transaction });

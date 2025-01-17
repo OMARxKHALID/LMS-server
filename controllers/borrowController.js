@@ -36,21 +36,11 @@ const hasUserAlreadyBorrowedBook = async (borrowed_by, borrowed_book) => {
   }
 };
 
-// Helper function to calculate the borrow price
-const calculateBorrowPrice = (borrowDays, borrowPrice) => {
-  return borrowDays * borrowPrice;
-};
-
-// Helper function to update the borrow record and book availability
-const updateBorrowAndBook = async (borrow, book, user) => {
-  // Reduce available copies of the book
-  book.available_copies -= 1;
-
-  // Add the borrow record to the user's borrowedBooks
-  user.borrowed_books.push(borrow._id);
-
-  // Save the borrow, book, and user
-  await Promise.all([user.save(), book.save(), borrow.save()]);
+// Helper function to calculate overdue days
+const calculateOverdueDays = (expectedReturnDate, currentDate) => {
+  const returnDate = new Date(expectedReturnDate).setHours(0, 0, 0, 0);
+  const today = new Date(currentDate).setHours(0, 0, 0, 0);
+  return Math.max(0, Math.floor((today - returnDate) / (1000 * 60 * 60 * 24)));
 };
 
 // Borrow a book
@@ -58,7 +48,6 @@ export const borrowBook = async (req, res) => {
   try {
     const { borrowed_by, borrowed_book, expected_return_date } = req.body;
 
-    // Validate input fields
     if (!borrowed_by || !borrowed_book || !expected_return_date) {
       return res.status(400).json({
         message: "Please provide User ID, Book ID, and Expected Return Date.",
@@ -75,25 +64,16 @@ export const borrowBook = async (req, res) => {
       });
     }
 
-    // Check if the user exists
     const user = await isUserExists(borrowed_by);
-
-    // Check if the book is available
     const book = await isBookAvailable(borrowed_book);
-
-    // Check if the user already borrowed the same book and hasn't returned it
     await hasUserAlreadyBorrowedBook(borrowed_by, borrowed_book);
 
-    // Calculate borrow price based on expected return date
     const borrowDays = Math.ceil(
       (expectedReturnDate - new Date()) / (1000 * 60 * 60 * 24)
     );
-    const totalBorrowPrice = calculateBorrowPrice(
-      borrowDays,
-      book.borrow_price
-    );
 
-    // Create a new borrow record
+    const totalBorrowPrice = borrowDays * book.borrow_price;
+
     const borrow = new Borrow({
       borrowed_by,
       borrowed_book,
@@ -102,11 +82,61 @@ export const borrowBook = async (req, res) => {
       total_price: book.price,
     });
 
-    // Update borrow record and book availability
-    await updateBorrowAndBook(borrow, book, user);
+    book.available_copies -= 1;
+    await Promise.all([book.save(), borrow.save()]);
 
-    res.status(201).json({
-      borrow,
+    res.status(201).json({ borrow });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({
+      error: error.message || "An error occurred. Please try again later.",
+    });
+  }
+};
+
+// Return a book with fine calculation
+export const returnBook = async (req, res) => {
+  try {
+    const { borrowId } = req.params;
+
+    const borrow = await Borrow.findById(borrowId);
+    if (!borrow) {
+      return res.status(404).json({ message: "Borrow record not found." });
+    }
+
+    const book = await Book.findById(borrow.borrowed_book);
+    if (!book) {
+      return res.status(404).json({ message: "Associated book not found." });
+    }
+
+    if (borrow.status === "returned") {
+      return res
+        .status(400)
+        .json({ message: "This book has already been returned." });
+    }
+
+    const currentDate = new Date();
+    const overdueDays = calculateOverdueDays(
+      borrow.expected_return_date,
+      currentDate
+    );
+
+    const overdueFine = overdueDays * book.borrow_fine;
+
+    borrow.return_date = currentDate;
+    borrow.status = "returned";
+    borrow.total_borrowed_fine = overdueFine;
+
+    book.available_copies += 1;
+
+    await Promise.all([book.save(), borrow.save()]);
+
+    res.status(200).json({
+      message: "Book returned successfully",
+      borrow: {
+        ...borrow.toObject(),
+        total_price_paid: borrow.total_borrow_price + overdueFine,
+      },
     });
   } catch (error) {
     console.error(error.message);
@@ -116,81 +146,27 @@ export const borrowBook = async (req, res) => {
   }
 };
 
-// Return a book
-export const returnBook = async (req, res) => {
-  try {
-    const { borrowId } = req.params;
-
-    // Find the borrow record
-    const borrow = await Borrow.findById(borrowId);
-    if (!borrow) {
-      return res.status(404).json({
-        message: "Borrow record not found. Please check the Borrow ID.",
-      });
-    }
-
-    const book = await Book.findById(borrow.borrowed_book);
-    if (!book) {
-      return res.status(404).json({
-        message: "The associated book was not found.",
-      });
-    }
-
-    if (borrow.return_date) {
-      return res.status(400).json({
-        message: "This book has already been returned.",
-      });
-    }
-
-    const currentDate = new Date();
-
-    // Update borrow record with return date and fine
-    borrow.return_date = currentDate;
-    borrow.status = "returned";
-
-    // Calculate overdue fine if any
-    const overdueFine = borrow.total_borrowed_fine;
-
-    // Save the borrow record
-    await borrow.save();
-
-    // Increase available copies of the book
-    book.available_copies += 1;
-
-    // Save the updated book
-    await book.save();
-
-    // Return updated borrow record
-    const updatedBorrow = {
-      ...borrow.toObject(),
-      late_fine: overdueFine,
-      total_price_paid: borrow.total_borrow_price + overdueFine,
-    };
-
-    res.status(200).json(updatedBorrow);
-  } catch (error) {
-    console.error(error.message);
-    res.status(500).json({
-      error:
-        error.message ||
-        "An error occurred while returning the book. Please try again later.",
-    });
-  }
-};
-
-// Get all borrow records
+// Get all borrow records with fine calculation
 export const getBorrowRecords = async (req, res) => {
   try {
-    // Fetch borrow records with populated user and book details
     const records = await Borrow.find()
-      .populate("borrowed_by", " user_name email")
-      .populate("borrowed_book", "title authors borrowed_fine pdf_files");
+      .populate("borrowed_by", "user_name email")
+      .populate("borrowed_book", "title author borrow_fine pdf_files");
 
-    // Calculate late fine for each record
     const updatedRecords = records.map((record) => {
+      const overdueDays = calculateOverdueDays(
+        record.expected_return_date,
+        new Date()
+      );
+
+      const lateFine =
+        overdueDays > 0 && record.status === "borrowed"
+          ? overdueDays * record.borrowed_book.borrow_fine
+          : 0;
+
       return {
         ...record.toObject(),
-        late_fine: record.total_borrowed_fine || 0,
+        total_borrowed_fine: lateFine,
       };
     });
 

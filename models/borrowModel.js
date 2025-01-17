@@ -2,12 +2,24 @@ import mongoose from "mongoose";
 
 const borrowSchema = new mongoose.Schema(
   {
-    borrowed_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    borrowed_book: { type: mongoose.Schema.Types.ObjectId, ref: "Book" },
+    borrowed_by: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    borrowed_book: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Book",
+      required: true,
+    },
     borrowed_date: { type: Date, default: Date.now },
     expected_return_date: { type: Date, required: true },
     return_date: { type: Date },
-    status: { type: String, default: "borrowed" },
+    status: {
+      type: String,
+      enum: ["borrowed", "returned"],
+      default: "borrowed",
+    },
     total_borrowed_fine: { type: Number, default: 0 },
     total_price: { type: Number, required: true },
     total_borrow_price: { type: Number, default: 0 },
@@ -16,62 +28,61 @@ const borrowSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Calculate overdue fine and refunds for early returns
+// Helper to calculate date differences in days
+const calculateDays = (start, end) =>
+  Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+
+// Pre-save hook to manage book copies and calculate fines/refunds
 borrowSchema.pre("save", async function (next) {
-  if (this.isNew) {
-    const book = await mongoose.model("Book").findById(this.borrowed_book);
-    if (book) {
+  try {
+    const Book = mongoose.model("Book");
+    const book = await Book.findById(this.borrowed_book);
+
+    if (!book) {
+      return next(new Error("Book not found"));
+    }
+
+    if (this.isNew) {
+      // Handle borrow logic
       if (book.available_copies > 0) {
-        // Reduce the available copies when a book is borrowed
         book.available_copies -= 1;
         await book.save();
       } else {
         return next(new Error("No copies available to borrow"));
       }
-    }
-  } else if (this.return_date) {
-    // When the book is returned
-    const book = await mongoose.model("Book").findById(this.borrowed_book);
-    if (book) {
-      // Increase available copies when the book is returned
+    } else if (this.return_date) {
+      // Handle return logic
       book.available_copies += 1;
       await book.save();
-    }
-  }
 
-  if (this.return_date) {
-    const currentDate = new Date();
-
-    // Calculate overdue fine if return date exceeds expected return date
-    if (this.return_date > this.expected_return_date) {
-      const overdueDays = Math.ceil(
-        (this.return_date - this.expected_return_date) / (1000 * 60 * 60 * 24)
+      const overdueDays = calculateDays(
+        this.expected_return_date,
+        this.return_date
       );
-      const book = await mongoose.model("Book").findById(this.borrowed_book);
-      if (book && book.borrow_fine) {
+
+      if (this.return_date > this.expected_return_date && book.borrow_fine) {
         this.total_borrowed_fine = overdueDays * book.borrow_fine;
+      } else if (this.return_date < this.expected_return_date) {
+        const unusedDays = calculateDays(
+          this.return_date,
+          this.expected_return_date
+        );
+        const totalDays = calculateDays(
+          this.borrowed_date,
+          this.expected_return_date
+        );
+        const dailyPrice = this.total_borrow_price / totalDays;
+        this.total_borrow_price = Math.max(
+          0,
+          this.total_borrow_price - unusedDays * dailyPrice
+        );
       }
     }
 
-    // Calculate refund if return date is earlier than expected return date
-    if (this.return_date < this.expected_return_date) {
-      const unusedDays = Math.floor(
-        (this.expected_return_date - this.return_date) / (1000 * 60 * 60 * 24)
-      );
-      const dailyBorrowPrice =
-        this.total_borrow_price /
-        Math.ceil(
-          (this.expected_return_date - this.borrowed_date) /
-            (1000 * 60 * 60 * 24)
-        );
-
-      const refundAmount = unusedDays * dailyBorrowPrice;
-      this.total_borrow_price -= refundAmount;
-
-      if (this.total_borrow_price < 0) this.total_borrow_price = 0;
-    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 const Borrow = mongoose.model("Borrow", borrowSchema);

@@ -25,6 +25,7 @@ const userSchema = new mongoose.Schema(
     reset_password_token: { type: String },
     reset_password_expires: { type: Date },
     borrowed_books: [{ type: mongoose.Schema.Types.ObjectId, ref: "Borrow" }],
+    purchased_books: [{ type: mongoose.Schema.Types.ObjectId, ref: "Book" }],
     status: {
       type: String,
       enum: ["active", "inactive"],

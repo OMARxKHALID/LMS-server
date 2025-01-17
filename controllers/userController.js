@@ -102,6 +102,7 @@ export const loginUser = async (req, res) => {
       transactions: user.transactions,
       address: user.address,
       borrowed_books: user.borrowed_books,
+      purchased_books: user.purchased_books,
     });
   } catch (error) {
     console.error("Error logging in:", error);
