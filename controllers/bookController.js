@@ -175,7 +175,6 @@ export const editBook = async (req, res) => {
 export const purchaseBook = async (req, res) => {
   try {
     const { purchased_by, purchased_book, quantity } = req.body;
-    console.log("🚀 ~ purchaseBook ~ purchased_book:", purchased_book);
 
     if (!purchased_by || !purchased_book || !quantity) {
       return res

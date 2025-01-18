@@ -82,9 +82,10 @@ export const borrowBook = async (req, res) => {
       total_price: book.price,
     });
 
-    book.available_copies -= 1;
-    await Promise.all([book.save(), borrow.save()]);
-
+    if (book.available_copies > 0) {
+      book.available_copies -= 1;
+      await Promise.all([book.save(), borrow.save()]);
+    }
     res.status(201).json({ borrow });
   } catch (error) {
     console.error(error.message);
