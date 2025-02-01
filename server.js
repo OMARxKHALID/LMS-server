@@ -10,7 +10,7 @@ import earningsRoutes from "./routes/earningsRoutes.js";
 import transactionRoutes from "./routes/transactionRoutes.js";
 
 import cors from "cors";
-
+// cofiguration
 dotenv.config();
 
 connectDB();
