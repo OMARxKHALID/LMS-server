@@ -70,7 +70,8 @@ export const getAllTransactions = async (req, res) => {
   try {
     const transactions = await Transaction.find()
       .populate("user", "user_name email")
-      .populate("book", "title author")
+      .populate("book", "title author price")
+      .sort({ createdAt: -1 }) // Sort by most recent first
       .exec();
 
     res.json(transactions);

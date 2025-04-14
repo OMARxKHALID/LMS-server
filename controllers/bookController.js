@@ -174,7 +174,8 @@ export const editBook = async (req, res) => {
 // Purchase a book
 export const purchaseBook = async (req, res) => {
   try {
-    const { purchased_by, purchased_book, quantity } = req.body;
+    const { purchased_by, purchased_book, quantity, payment_details } =
+      req.body;
 
     if (!purchased_by || !purchased_book || !quantity) {
       return res
@@ -203,6 +204,7 @@ export const purchaseBook = async (req, res) => {
       quantity,
       total_price: totalPrice,
       status: "success",
+      payment_details, // Save the payment details
     });
 
     await transaction.save();

@@ -10,7 +10,41 @@ const transactionSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["success", "failed", "pending"],
-      default: "success",
+      default: "pending",
+    },
+    payment_details: {
+      last_four: {
+        type: String,
+        required: true,
+        minlength: 4,
+        maxlength: 4,
+      },
+      card_holder: {
+        type: String,
+        required: true,
+      },
+      expiry_date: {
+        type: String,
+        required: true,
+        validate: {
+          validator: function (v) {
+            return /^(0[1-9]|1[0-2])\/\d{2}$/.test(v);
+          },
+          message: (props) =>
+            `${props.value} is not a valid expiry date format (MM/YY)!`,
+        },
+      },
+      card_type: {
+        type: String,
+        enum: ["Visa", "Mastercard", "American Express", "Invalid Card"],
+        required: true,
+        validate: {
+          validator: function (v) {
+            return ["Visa", "Mastercard", "American Express"].includes(v);
+          },
+          message: (props) => `${props.value} is not a valid card type`,
+        },
+      },
     },
   },
   { timestamps: true }
