@@ -106,6 +106,9 @@ export const deleteBook = async (req, res) => {
 
 // Edit a book by ID
 export const editBook = async (req, res) => {
+  console.log("Server: Received edit book request for ID:", req.params.id);
+  console.log("Request body:", req.body);
+
   try {
     const {
       title,
@@ -122,13 +125,17 @@ export const editBook = async (req, res) => {
       pdf_files,
       uploaded_by,
       is_purchased,
+      cover_image_url, // Make sure to include this
     } = req.body;
 
     const book = await Book.findById(req.params.id);
+    console.log("Found existing book:", book);
+
     if (!book) return res.status(404).json({ message: "Book not found" });
 
     // Check if ISBN is unique if changed
     if (isbn !== book.isbn) {
+      console.log("ISBN changed, checking uniqueness...");
       const existingBook = await checkIfBookExists(isbn);
       if (existingBook)
         return res
@@ -139,6 +146,8 @@ export const editBook = async (req, res) => {
     const available_copies = total_copies
       ? total_copies - (book.total_copies - book.available_copies)
       : book.available_copies;
+
+    console.log("Calculated available copies:", available_copies);
 
     const updatedBook = await Book.findByIdAndUpdate(
       req.params.id,
@@ -158,15 +167,17 @@ export const editBook = async (req, res) => {
         pdf_files,
         uploaded_by,
         is_purchased,
+        cover_image_url, // Make sure to include this in the update
       },
       { new: true }
     );
 
+    console.log("Updated book in database:", updatedBook);
     res
       .status(200)
       .json({ message: "Book updated successfully", book: updatedBook });
   } catch (error) {
-    console.error(error);
+    console.error("Server error during book update:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
