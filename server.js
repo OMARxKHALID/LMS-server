@@ -23,14 +23,15 @@ app.use(express.urlencoded({ extended: true }));
 
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 
-app.use(
-  cors({
-    origin: CLIENT_URL,
-    credentials: true,
-  })
-);
+// Configure CORS
+const corsOptions = {
+  origin: [CLIENT_URL, "http://localhost:5173", "http://127.0.0.1:5173"],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
-app.options("*", cors());
+app.use(cors(corsOptions));
 
 app.use(cookieParser());
 

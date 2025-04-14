@@ -155,6 +155,14 @@ export const getBorrowRecords = async (req, res) => {
       .populate("borrowed_book", "title author borrow_fine pdf_files");
 
     const updatedRecords = records.map((record) => {
+      // Add null check for borrowed_book
+      if (!record.borrowed_book) {
+        return {
+          ...record.toObject(),
+          total_borrowed_fine: 0,
+        };
+      }
+
       const overdueDays = calculateOverdueDays(
         record.expected_return_date,
         new Date()
@@ -162,7 +170,7 @@ export const getBorrowRecords = async (req, res) => {
 
       const lateFine =
         overdueDays > 0 && record.status === "borrowed"
-          ? overdueDays * record.borrowed_book.borrow_fine
+          ? overdueDays * (record.borrowed_book.borrow_fine || 0) // Add fallback value
           : 0;
 
       return {
