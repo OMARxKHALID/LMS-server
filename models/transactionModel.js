@@ -46,6 +46,16 @@ const transactionSchema = new mongoose.Schema(
         },
       },
     },
+    payment_type: {
+      type: String,
+      enum: ["full", "installment"],
+      required: true,
+    },
+    installment_plan: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "InstallmentPlan",
+    },
+    payment_number: Number,
   },
   { timestamps: true }
 );
